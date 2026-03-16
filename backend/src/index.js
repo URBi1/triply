@@ -12,6 +12,7 @@ import authRoutes from './routes/auth.js';
 import tripRoutes from './routes/trips.js';
 import photoRoutes from './routes/photos.js';
 import { ssePlugin } from './routes/sse.js';
+import db from './db/index.js';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = resolve(process.env.UPLOAD_DIR || join(__dir, '../../uploads'));
@@ -28,10 +29,15 @@ await app.register(staticFiles, {
   prefix: '/files/',
 });
 
-// Auth decorator
+// Auth decorator — verifies JWT and checks user still exists in DB
 app.decorate('authenticate', async (req, reply) => {
-  try { await req.jwtVerify(); }
-  catch { reply.code(401).send({ error: 'Unauthorized' }); }
+  try {
+    await req.jwtVerify();
+    const user = db.prepare('SELECT id FROM users WHERE id = ?').get(req.user.userId);
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+  } catch {
+    reply.code(401).send({ error: 'Unauthorized' });
+  }
 });
 
 ssePlugin(app);

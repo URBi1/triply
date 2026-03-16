@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View } from 'react-native';
 
 import { getUser } from './src/store/auth';
+import { setUnauthorizedHandler } from './src/api/client';
 import RegisterScreen from './src/screens/RegisterScreen';
 import TripsScreen    from './src/screens/TripsScreen';
 import AlbumScreen    from './src/screens/AlbumScreen';
@@ -17,6 +18,7 @@ export default function App() {
 
   useEffect(() => {
     getUser().then(u => { setUser(u); setReady(true); });
+    setUnauthorizedHandler(() => setUser(null));
   }, []);
 
   if (!ready) return (

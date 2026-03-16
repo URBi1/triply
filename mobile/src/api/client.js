@@ -1,6 +1,10 @@
-import { getToken } from '../store/auth';
+import { getToken, clearAuth } from '../store/auth';
 
 export const API_URL = 'https://triply-api.onrender.com';
+
+// Called by App.js to handle global logout (token expired / server reset)
+let _onUnauthorized = null;
+export function setUnauthorizedHandler(fn) { _onUnauthorized = fn; }
 
 async function request(method, path, body, isMultipart = false) {
   const token = await getToken();
@@ -14,6 +18,12 @@ async function request(method, path, body, isMultipart = false) {
     headers,
     body: isMultipart ? body : body ? JSON.stringify(body) : undefined,
   });
+
+  if (res.status === 401) {
+    await clearAuth();
+    _onUnauthorized?.();
+    throw new Error('Session expired');
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
