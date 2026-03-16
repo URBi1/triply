@@ -79,6 +79,8 @@ export default function AlbumScreen({ route, navigation }) {
     setUploading(true);
     let uploaded = 0;
 
+    let firstError = null;
+
     for (const asset of assets) {
       try {
         const info = await MediaLibrary.getAssetInfoAsync(asset);
@@ -86,9 +88,9 @@ export default function AlbumScreen({ route, navigation }) {
         // On Android content:// URIs can't be uploaded directly — copy to cache first
         let uri = info.localUri || info.uri;
         const ext = (asset.filename?.split('.').pop() || 'jpg').toLowerCase();
-        if (uri.startsWith('content://') || uri.startsWith('ph://')) {
+        if (!uri || uri.startsWith('content://') || uri.startsWith('ph://')) {
           const dest = `${FileSystem.cacheDirectory}upload_${asset.id}.${ext}`;
-          await FileSystem.copyAsync({ from: uri, to: dest });
+          await FileSystem.copyAsync({ from: uri || info.uri, to: dest });
           uri = dest;
         }
 
@@ -101,13 +103,15 @@ export default function AlbumScreen({ route, navigation }) {
         await api.upload(`/trips/${trip.id}/photos`, form);
         uploaded++;
 
-        // Clean up cache file
         FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
-      } catch { /* skip failed photo */ }
+      } catch (e) {
+        if (!firstError) firstError = e?.message || String(e);
+      }
     }
 
     setUploading(false);
-    Alert.alert('Done!', `Uploaded ${uploaded} of ${assets.length} photos`);
+    const msg = firstError ? `\n\nError: ${firstError}` : '';
+    Alert.alert('Done!', `Uploaded ${uploaded} of ${assets.length} photos${msg}`);
     loadPhotos();
   }
 
