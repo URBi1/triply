@@ -83,27 +83,20 @@ export default function AlbumScreen({ route, navigation }) {
 
     for (const asset of assets) {
       try {
-        const info = await MediaLibrary.getAssetInfoAsync(asset);
-
-        // On Android content:// URIs can't be uploaded directly — copy to cache first
-        let uri = info.localUri || info.uri;
         const ext = (asset.filename?.split('.').pop() || 'jpg').toLowerCase();
-        if (!uri || uri.startsWith('content://') || uri.startsWith('ph://')) {
-          const dest = `${FileSystem.cacheDirectory}upload_${asset.id}.${ext}`;
-          await FileSystem.copyAsync({ from: uri || info.uri, to: dest });
-          uri = dest;
-        }
+        const dest = `${FileSystem.cacheDirectory}upload_${asset.id}.${ext}`;
+
+        // expo-file-system handles content:// URIs on Android natively
+        await FileSystem.copyAsync({ from: asset.uri, to: dest });
 
         const form = new FormData();
-        form.append('file', { uri, name: `photo_${asset.id}.${ext}`, type: `image/${ext}` });
-        if (info.location?.latitude)  form.append('lat',      String(info.location.latitude));
-        if (info.location?.longitude) form.append('lng',      String(info.location.longitude));
-        if (asset.creationTime)       form.append('taken_at', new Date(asset.creationTime).toISOString());
+        form.append('file', { uri: dest, name: `photo_${asset.id}.${ext}`, type: `image/${ext}` });
+        if (asset.creationTime) form.append('taken_at', new Date(asset.creationTime).toISOString());
 
         await api.upload(`/trips/${trip.id}/photos`, form);
         uploaded++;
 
-        FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+        FileSystem.deleteAsync(dest, { idempotent: true }).catch(() => {});
       } catch (e) {
         if (!firstError) firstError = e?.message || String(e);
       }
