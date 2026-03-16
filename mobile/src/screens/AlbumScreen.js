@@ -4,7 +4,7 @@ import {
   StyleSheet, ActivityIndicator, Alert, Dimensions,
 } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { api, API_URL } from '../api/client';
 
 const { width } = Dimensions.get('window');
