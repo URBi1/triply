@@ -4,6 +4,7 @@ import {
   StyleSheet, ActivityIndicator, Alert, Dimensions,
 } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
 import { api, API_URL } from '../api/client';
 
 const { width } = Dimensions.get('window');
@@ -80,20 +81,29 @@ export default function AlbumScreen({ route, navigation }) {
 
     for (const asset of assets) {
       try {
-        const info   = await MediaLibrary.getAssetInfoAsync(asset);
-        const form   = new FormData();
-        const uri    = info.localUri || info.uri;
-        const name   = uri.split('/').pop();
-        const ext    = name.split('.').pop().toLowerCase();
+        const info = await MediaLibrary.getAssetInfoAsync(asset);
 
-        form.append('file', { uri, name, type: `image/${ext}` });
+        // On Android content:// URIs can't be uploaded directly — copy to cache first
+        let uri = info.localUri || info.uri;
+        const ext = (asset.filename?.split('.').pop() || 'jpg').toLowerCase();
+        if (uri.startsWith('content://') || uri.startsWith('ph://')) {
+          const dest = `${FileSystem.cacheDirectory}upload_${asset.id}.${ext}`;
+          await FileSystem.copyAsync({ from: uri, to: dest });
+          uri = dest;
+        }
+
+        const form = new FormData();
+        form.append('file', { uri, name: `photo_${asset.id}.${ext}`, type: `image/${ext}` });
         if (info.location?.latitude)  form.append('lat',      String(info.location.latitude));
         if (info.location?.longitude) form.append('lng',      String(info.location.longitude));
         if (asset.creationTime)       form.append('taken_at', new Date(asset.creationTime).toISOString());
 
         await api.upload(`/trips/${trip.id}/photos`, form);
         uploaded++;
-      } catch { /* skip failed */ }
+
+        // Clean up cache file
+        FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+      } catch { /* skip failed photo */ }
     }
 
     setUploading(false);
